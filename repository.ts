@@ -29,11 +29,16 @@ export async function insert<T extends {}>(
   if (conflict && conflict.yes) {
     if (conflict.on && conflict.do) {
       return db.execute(
-        `${sql} ON CONFLICT (${conflict.on}) DO ${conflict.do}`,
+        `${sql} ON DUPLICATE KEY UPDATE ${conflict.do}`,
         values
       );
     }
-    return db.execute(`${sql} ON CONFLICT DO NOTHING`, values);
+    return db.execute(
+      `${sql} ON DUPLICATE KEY UPDATE ${keys
+        .map((key) => `${key} = VALUES(${key})`)
+        .join(', ')}`,
+      values
+    );
   }
 
   return db.execute(sql, values);
@@ -61,11 +66,16 @@ export async function insertMany<T extends {}>(
   if (conflict && conflict.yes) {
     if (conflict.on && conflict.do) {
       return db.execute(
-        `${sql} ON CONFLICT (${conflict.on}) DO ${conflict.do}`,
+        `${sql} ON DUPLICATE KEY UPDATE ${conflict.do}`,
         values.flat()
       );
     }
-    return db.execute(`${sql} ON CONFLICT DO NOTHING`, values.flat());
+    return db.execute(
+      `${sql} ON DUPLICATE KEY UPDATE ${keys
+        .map((key) => `${key} = VALUES(${key})`)
+        .join(', ')}`,
+      values.flat()
+    );
   }
 
   return db.execute(sql, values.flat());

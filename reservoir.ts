@@ -10,7 +10,6 @@ export interface IActivity {
   listing_from: number;
   listing_to: number;
   event_timestamp: string;
-  event_id: string;
 }
 
 export interface IEvents {
@@ -104,7 +103,7 @@ export interface IEvent {
 export async function* fetchListingActivities(
   limit = 1000,
   eventId?: string
-): AsyncGenerator<IActivity[]> {
+): AsyncGenerator<[string, IActivity[]]> {
   // fetch from the api
   let done = false;
   let continuationToken = '';
@@ -138,8 +137,10 @@ export async function* fetchListingActivities(
           maker: event.order.maker,
           listing_from: event.order.validFrom,
           listing_to: event.order.validUntil,
-          event_timestamp: event.event.createdAt,
-          event_id: event.event.id,
+          event_timestamp: new Date(event.event.createdAt)
+            .toISOString()
+            .slice(0, 19)
+            .replace('T', ' '),
         });
       }
     });
@@ -148,6 +149,6 @@ export async function* fetchListingActivities(
     if (eventId && events.events.some((event) => event.event.id === eventId)) {
       done = true;
     }
-    yield activities;
+    yield [events.events[events.events.length - 1].event.id, activities];
   }
 }

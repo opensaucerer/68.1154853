@@ -11,7 +11,7 @@ export async function captureEvents() {
   let eventId = '';
 
   // find the last processed event id
-  const [rows] = (await repository.selectOne('events', {
+  const [rows] = (await repository.selectOne('constants', {
     name: 'last_processed_event_id',
   })) as RowDataPacket[];
 
@@ -19,12 +19,10 @@ export async function captureEvents() {
     eventId = rows[0].value;
   }
 
-  for await (const activities of reservoir.fetchListingActivities(
-    1000,
-    eventId
-  )) {
-    console.log('Activities', activities);
-
+  for await (const [
+    lastEventId,
+    activities,
+  ] of reservoir.fetchListingActivities(1000, eventId)) {
     // save the activities to the database
     await repository.insertMany(activities, 'activities');
 
@@ -33,12 +31,12 @@ export async function captureEvents() {
 
     // update the last processed event id
     await repository.insert(
-      { last_processed_event_id: activities[activities.length - 1].event_id },
-      'events',
+      { name: 'last_processed_event_id', value: lastEventId },
+      'constants',
       {
         yes: true,
         on: 'name',
-        do: 'UPDATE SET value = EXCLUDED.value',
+        do: 'value = VALUES(value)',
       }
     );
   }
@@ -59,44 +57,39 @@ export async function postCaptureProcessing() {
       '[postCaptureProcessing] Processing ' + payload.length + ' activities'
     );
 
-    // do some processing
-    console.log('Processing activities', payload);
-
     const nfts: Record<string, INft> = {};
 
     payload.forEach((activity) => {
       if (!nfts[activity.contract_address + activity.token_index]) {
-        // if the listing has expired and it is more recent than the current price, set the current price to null
-        const current_price =
-          activity.listing_to &&
-          activity.listing_to < Date.now() / 1000 &&
-          new Date(activity.event_timestamp) >
-            new Date(
-              nfts[
-                activity.contract_address + activity.token_index
-              ].last_listing_timestamp
-            )
-            ? null
-            : activity.listing_price;
-
         nfts[activity.contract_address + activity.token_index] = {
           token_index: activity.token_index,
           contract_address: activity.contract_address,
-          current_price,
+          current_price: activity.listing_price,
           last_listing_timestamp: activity.event_timestamp,
         };
-      } else {
+      }
+
+      // if the listing has expired and it is more recent than the current price, set the current price to null
+      if (
+        activity.listing_to &&
+        activity.listing_to < Date.now() / 1000 &&
+        activity.event_timestamp >
+          nfts[activity.contract_address + activity.token_index]
+            .last_listing_timestamp
+      ) {
+        nfts[activity.contract_address + activity.token_index].current_price =
+          null;
+      }
+
+      if (activity.listing_to && activity.listing_to >= Date.now() / 1000) {
         // if the listing is not expired, set the current price to the lowest price
-        if (activity.listing_to && activity.listing_to >= Date.now() / 1000) {
-          if (
-            activity.listing_price <
-            (nfts[activity.contract_address + activity.token_index]
-              .current_price ?? 0)
-          ) {
-            nfts[
-              activity.contract_address + activity.token_index
-            ].current_price = activity.listing_price;
-          }
+        if (
+          activity.listing_price <
+          (nfts[activity.contract_address + activity.token_index]
+            .current_price ?? 0)
+        ) {
+          nfts[activity.contract_address + activity.token_index].current_price =
+            activity.listing_price;
         }
       }
     });
@@ -105,7 +98,7 @@ export async function postCaptureProcessing() {
     await repository.insertMany(Object.values(nfts), 'nfts', {
       yes: true,
       on: 'contract_address, token_index',
-      do: 'UPDATE SET current_price = EXCLUDED.current_price, last_listing_timestamp = EXCLUDED.last_listing_timestamp',
+      do: 'current_price = VALUES(current_price), last_listing_timestamp = VALUES(last_listing_timestamp)',
     });
 
     logger.info(

@@ -1,44 +1,22 @@
---   contract_address: string; size 42
---   token_index: string;
---   listing_price: number;
---   maker: string;
---   listing_from: number;
---   listing_to: number;
---   event_timestamp: string;
-
 CREATE TABLE IF NOT EXISTS activities (
-  contract_address TEXT NOT NULL,
-  token_index TEXT NOT NULL,
-  listing_price NUMERIC NOT NULL,
-  maker TEXT NOT NULL,
-  listing_from TIMESTAMP,
-  listing_to TIMESTAMP,
+  contract_address VARCHAR(42) NOT NULL,
+  token_index VARCHAR(255) NOT NULL,
+  listing_price DECIMAL(10, 2) NOT NULL,
+  maker VARCHAR(42) NOT NULL,
+  listing_from BIGINT,
+  listing_to BIGINT,
   event_timestamp TIMESTAMP NOT NULL
 );
 
---  id
--- - token_index: string; size 42
--- - contract_address: string; size 42
--- - current_price: number
--- - last_listing_timestamp: number
-
 CREATE TABLE IF NOT EXISTS nfts (
-  token_index TEXT NOT NULL,
-  contract_address TEXT NOT NULL,
-  current_price NUMERIC NOT NULL,
-  last_listing_timestamp TIMESTAMP NOT NULL
+  token_index VARCHAR(255) NOT NULL,
+  contract_address VARCHAR(42) NOT NULL,
+  current_price DECIMAL(18, 2) NOT NULL,
+  last_listing_timestamp TIMESTAMP NOT NULL,
+  UNIQUE(token_index, contract_address)
 );
 
--- unique token_index on nfts (token_index, contract_address);
-CREATE UNIQUE INDEX nfts_index_contract_address ON nfts (token_index, contract_address);
-
-
--- constants
--- - id
--- name: string (unique)
--- value: string
-
 CREATE TABLE IF NOT EXISTS constants (
-    name TEXT NOT NULL UNIQUE,
-    value TEXT NOT NULL
+    name VARCHAR(255) NOT NULL UNIQUE,
+    value VARCHAR(255) NOT NULL
 );
