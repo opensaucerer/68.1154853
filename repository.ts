@@ -1,9 +1,17 @@
+import { PoolConnection } from 'mysql2/promise';
 import * as db from './pool';
 
 export interface IConflict {
   yes: boolean;
   on?: string;
   do?: string;
+}
+
+/**
+ * Starts a new transaction.
+ */
+export async function begin() {
+  return db.begin();
 }
 
 /**
@@ -17,7 +25,8 @@ export interface IConflict {
 export async function insert<T extends {}>(
   object: T,
   table: string,
-  conflict?: IConflict
+  conflict?: IConflict,
+  tx?: PoolConnection
 ) {
   const keys = Object.keys(object);
   const values = Object.values(object);
@@ -28,12 +37,12 @@ export async function insert<T extends {}>(
   // handle conflict
   if (conflict && conflict.yes) {
     if (conflict.on && conflict.do) {
-      return db.execute(
+      return (tx ?? db).execute(
         `${sql} ON DUPLICATE KEY UPDATE ${conflict.do}`,
         values
       );
     }
-    return db.execute(
+    return (tx ?? db).execute(
       `${sql} ON DUPLICATE KEY UPDATE ${keys
         .map((key) => `${key} = VALUES(${key})`)
         .join(', ')}`,
@@ -41,7 +50,7 @@ export async function insert<T extends {}>(
     );
   }
 
-  return db.execute(sql, values);
+  return (tx ?? db).execute(sql, values);
 }
 
 /**
@@ -55,7 +64,8 @@ export async function insert<T extends {}>(
 export async function insertMany<T extends {}>(
   objects: T[],
   table: string,
-  conflict?: IConflict
+  conflict?: IConflict,
+  tx?: PoolConnection
 ) {
   const keys = Object.keys(objects[0]);
   const values = objects.map((object) => Object.values(object));
@@ -65,12 +75,12 @@ export async function insertMany<T extends {}>(
 
   if (conflict && conflict.yes) {
     if (conflict.on && conflict.do) {
-      return db.execute(
+      return (tx ?? db).execute(
         `${sql} ON DUPLICATE KEY UPDATE ${conflict.do}`,
         values.flat()
       );
     }
-    return db.execute(
+    return (tx ?? db).execute(
       `${sql} ON DUPLICATE KEY UPDATE ${keys
         .map((key) => `${key} = VALUES(${key})`)
         .join(', ')}`,
@@ -78,7 +88,7 @@ export async function insertMany<T extends {}>(
     );
   }
 
-  return db.execute(sql, values.flat());
+  return (tx ?? db).execute(sql, values.flat());
 }
 
 /**
@@ -92,7 +102,8 @@ export async function insertMany<T extends {}>(
 export async function update<T extends {}>(
   object: T,
   where: Partial<T>,
-  table: string
+  table: string,
+  tx?: PoolConnection
 ) {
   const keys = Object.keys(object);
   const values = Object.values(object);
@@ -101,7 +112,7 @@ export async function update<T extends {}>(
   const sql = `UPDATE ${table} SET ${keys
     .map((key) => `${key} = ?`)
     .join(', ')} WHERE ${whereKeys.map((key) => `${key} = ?`).join(' AND ')}`;
-  return db.execute(sql, [...values, ...whereValues]);
+  return (tx ?? db).execute(sql, [...values, ...whereValues]);
 }
 
 /**
@@ -111,13 +122,17 @@ export async function update<T extends {}>(
  * @param table
  * @returns
  */
-export async function remove<T extends {}>(where: Partial<T>, table: string) {
+export async function remove<T extends {}>(
+  where: Partial<T>,
+  table: string,
+  tx?: PoolConnection
+) {
   const keys = Object.keys(where);
   const values = Object.values(where);
   const sql = `DELETE FROM ${table} WHERE ${keys
     .map((key) => `${key} = ?`)
     .join(' AND ')}`;
-  return db.execute(sql, values);
+  return (tx ?? db).execute(sql, values);
 }
 
 /**
@@ -127,13 +142,17 @@ export async function remove<T extends {}>(where: Partial<T>, table: string) {
  * @param table
  * @returns
  */
-export async function count<T extends {}>(where: Partial<T>, table: string) {
+export async function count<T extends {}>(
+  where: Partial<T>,
+  table: string,
+  tx?: PoolConnection
+) {
   const keys = Object.keys(where);
   const values = Object.values(where);
   const sql = `SELECT COUNT(*) FROM ${table} WHERE ${keys
     .map((key) => `${key} = ?`)
     .join(' AND ')}`;
-  return db.query(sql, values);
+  return (tx ?? db).query(sql, values);
 }
 
 export interface IPagination {
@@ -152,14 +171,19 @@ export interface IPagination {
 export async function select<T extends {}>(
   table: string,
   where: Partial<T>,
-  pagination: IPagination
+  pagination: IPagination,
+  tx?: PoolConnection
 ) {
   const keys = Object.keys(where);
   const values = Object.values(where);
   const sql = `SELECT * FROM ${table} WHERE ${keys
     .map((key) => `${key} = ?`)
     .join(' AND ')} LIMIT ? OFFSET ?`;
-  return db.query(sql, [...values, pagination.limit, pagination.offset]);
+  return (tx ?? db).query(sql, [
+    ...values,
+    pagination.limit,
+    pagination.offset,
+  ]);
 }
 
 /**
@@ -171,14 +195,35 @@ export async function select<T extends {}>(
  */
 export async function selectOne<T extends {}>(
   table: string,
-  where?: Partial<T>
+  where?: Partial<T>,
+  tx?: PoolConnection
 ) {
   const keys = where ? Object.keys(where) : [];
   const values = where ? Object.values(where) : [];
   const sql = `SELECT * FROM ${table} ${
     where ? `WHERE ${keys.map((key) => `${key} = ?`).join(' AND ')}` : ''
   }`;
-  return db.query(sql, values);
+  return (tx ?? db).query(sql, values);
+}
+
+/**
+ * Selects one record from the database on the specified table and locks it.
+ *
+ * @param table
+ * @param where
+ * @returns
+ */
+export async function selectOneForUpdate<T extends {}>(
+  table: string,
+  where?: Partial<T>,
+  tx?: PoolConnection
+) {
+  const keys = where ? Object.keys(where) : [];
+  const values = where ? Object.values(where) : [];
+  const sql = `SELECT * FROM ${table} ${
+    where ? `WHERE ${keys.map((key) => `${key} = ?`).join(' AND ')}` : ''
+  } FOR UPDATE`;
+  return (tx ?? db).query(sql, values);
 }
 
 /**
@@ -190,8 +235,9 @@ export async function selectOne<T extends {}>(
  */
 export async function selectAll<T extends {}>(
   table: string,
-  pagination: IPagination
+  pagination: IPagination,
+  tx?: PoolConnection
 ) {
   const sql = `SELECT * FROM ${table} LIMIT ? OFFSET ?`;
-  return db.query(sql, [pagination.limit, pagination.offset]);
+  return (tx ?? db).query(sql, [pagination.limit, pagination.offset]);
 }

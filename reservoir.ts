@@ -10,6 +10,7 @@ export interface IActivity {
   listing_from: number;
   listing_to: number;
   event_timestamp: string;
+  event_id: string;
 }
 
 export interface IEvents {
@@ -102,14 +103,13 @@ export interface IEvent {
  */
 export async function* fetchListingActivities(
   limit = 1000,
-  eventId?: string
-): AsyncGenerator<[string, IActivity[]]> {
+  continuationToken?: string
+): AsyncGenerator<[IActivity[], string]> {
   // fetch from the api
   let done = false;
-  let continuationToken = '';
 
   while (!done) {
-    let url = `${constant.RESERVOIR_API_URL}/events/asks/v3?limit=${limit}`;
+    let url = `${constant.RESERVOIR_API_URL}/events/asks/v3?limit=${limit}&sortDirection=asc`;
     if (continuationToken) {
       url += `&continuation=${continuationToken}`;
     }
@@ -118,7 +118,7 @@ export async function* fetchListingActivities(
     const events: IEvents = response.data;
 
     // if there are no more events, we are done
-    if (!events.events.length) {
+    if (!events.events?.length) {
       done = true;
     }
     if (!events.continuation) {
@@ -128,7 +128,8 @@ export async function* fetchListingActivities(
       continuationToken = events.continuation;
     }
     const activities: IActivity[] = [];
-    events.events.forEach((event) => {
+    events.events?.forEach((event) => {
+      // only return new-order events that have not previously been processed
       if (event.event.kind === 'new-order') {
         activities.push({
           contract_address: event.order.contract,
@@ -141,14 +142,13 @@ export async function* fetchListingActivities(
             .toISOString()
             .slice(0, 19)
             .replace('T', ' '),
+          event_id: event.event.id,
         });
       }
     });
 
-    // if we have an event id, we need to check if we have reached it
-    if (eventId && events.events.some((event) => event.event.id === eventId)) {
-      done = true;
+    if (activities.length) {
+      yield [activities, continuationToken];
     }
-    yield [events.events[events.events.length - 1].event.id, activities];
   }
 }

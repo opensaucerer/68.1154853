@@ -23,6 +23,12 @@ export async function execute(sql: string, values?: any[]) {
   return results;
 }
 
+export async function begin() {
+  const connection = await pool.getConnection();
+  connection.beginTransaction();
+  return connection;
+}
+
 export async function close() {
   await pool.end();
 }

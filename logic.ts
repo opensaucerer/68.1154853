@@ -8,37 +8,45 @@ import { RowDataPacket } from 'mysql2';
 export async function captureEvents() {
   logger.info('[captureEvents] Starting to capture events');
 
-  let eventId = '';
+  let continuationToken = '';
 
   // find the last processed event id
   const [rows] = (await repository.selectOne('constants', {
-    name: 'last_processed_event_id',
+    name: 'last_processed_continuation_token',
   })) as RowDataPacket[];
 
   if (rows && rows.length) {
-    eventId = rows[0].value;
+    continuationToken = rows[0].value;
   }
 
-  for await (const [
-    lastEventId,
-    activities,
-  ] of reservoir.fetchListingActivities(1000, eventId)) {
+  for await (const [activities, token] of reservoir.fetchListingActivities(
+    1000, // adjust the limit as needed
+    continuationToken
+  )) {
     // save the activities to the database
-    await repository.insertMany(activities, 'activities');
+    await repository.insertMany(activities, 'activities', {
+      yes: true,
+      do: 'event_timestamp = VALUES(event_timestamp)',
+    });
 
     // emit an event
     event.emit(env.POST_CAPTURE_EVENT, activities);
 
-    // update the last processed event id
-    await repository.insert(
-      { name: 'last_processed_event_id', value: lastEventId },
-      'constants',
-      {
-        yes: true,
-        on: 'name',
-        do: 'value = VALUES(value)',
-      }
-    );
+    if (token) {
+      // update the last processed event continuation token
+      await repository.insert(
+        {
+          name: 'last_processed_continuation_token',
+          value: token,
+        },
+        'constants',
+        {
+          yes: true,
+          on: 'name',
+          do: 'value = VALUES(value)',
+        }
+      );
+    }
   }
 
   logger.info('[captureEvents] Finished capturing events');
