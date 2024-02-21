@@ -25,12 +25,13 @@ CREATE TABLE IF NOT EXISTS activities (
 CREATE TABLE IF NOT EXISTS nfts (
   index TEXT NOT NULL,
   contract_address TEXT NOT NULL,
-  current_price NUMERIC NOT NULL
+  current_price NUMERIC NOT NULL,
   last_listing_timestamp TIMESTAMP NOT NULL
 );
 
 -- unique index on nfts (index, contract_address);
-CREATE UNIQUE INDEX IF NOT EXISTS nfts_index_contract_address ON nfts (index, contract_address);
+CREATE UNIQUE INDEX nfts_index_contract_address ON nfts (index, contract_address);
+
 
 -- constants
 -- - id
