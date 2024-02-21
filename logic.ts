@@ -5,12 +5,19 @@ import env from './env';
 import logger from './logger';
 
 export async function captureEvents() {
-  logger.debug('[captureEvents] Starting to capture events');
+  logger.info('[captureEvents] Starting to capture events');
+
+  let eventId = '';
 
   // find the last processed event id
-  const row = await repository.selectOne('events');
+  const row = await repository.selectOne('events', {
+    name: 'last_processed_event_id',
+  });
 
-  for await (const activities of reservoir.fetchListingActivities()) {
+  for await (const activities of reservoir.fetchListingActivities(
+    1000,
+    eventId
+  )) {
     console.log('Activities', activities);
 
     // save the activities to the database
@@ -18,28 +25,39 @@ export async function captureEvents() {
 
     // emit an event
     event.emit(env.POST_CAPTURE_EVENT, activities);
+
+    // update the last processed event id
+    await repository.insert(
+      { last_processed_event_id: activities[activities.length - 1].event_id },
+      'events',
+      {
+        yes: true,
+        on: 'name',
+        do: 'UPDATE SET value = EXCLUDED.value',
+      }
+    );
   }
 
-  logger.debug('[captureEvents] Finished capturing events');
+  logger.info('[captureEvents] Finished capturing events');
 }
 
 export interface INft {
-  index: number;
+  index: string;
   contract_address: string;
-  current_price: number;
-  last_listing_timestamp: number;
+  current_price: number | null;
+  last_listing_timestamp: string;
 }
 
 export async function postCaptureProcessing() {
   event.on(env.POST_CAPTURE_EVENT, async (payload: reservoir.IActivity[]) => {
-    logger.debug(
+    logger.info(
       '[postCaptureProcessing] Processing ' + payload.length + ' activities'
     );
 
     // do some processing
     console.log('Processing activities', payload);
 
-    const nfts: Partial<INft> = {};
+    const nfts: Record<string, INft> = {};
 
     payload.forEach((activity) => {
       if (!nfts[activity.contract_address + activity.token_index]) {
@@ -85,7 +103,7 @@ export async function postCaptureProcessing() {
       do: 'UPDATE SET current_price = EXCLUDED.current_price, last_listing_timestamp = EXCLUDED.last_listing_timestamp',
     });
 
-    logger.debug(
+    logger.info(
       '[postCaptureProcessing] Finished processing ' +
         payload.length +
         ' activities'

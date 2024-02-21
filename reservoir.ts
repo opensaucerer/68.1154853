@@ -10,6 +10,7 @@ export interface IActivity {
   listing_from: number;
   listing_to: number;
   event_timestamp: string;
+  event_id: string;
 }
 
 export interface IEvents {
@@ -124,10 +125,6 @@ export async function* fetchListingActivities(
     if (!events.continuation) {
       done = true;
     }
-    // if we have an event id, we need to check if we have reached it
-    if (eventId && events.events.some((event) => event.event.id === eventId)) {
-      done = true;
-    }
     if (events.continuation) {
       continuationToken = events.continuation;
     }
@@ -142,9 +139,15 @@ export async function* fetchListingActivities(
           listing_from: event.order.validFrom,
           listing_to: event.order.validUntil,
           event_timestamp: event.event.createdAt,
+          event_id: event.event.id,
         });
       }
     });
+
+    // if we have an event id, we need to check if we have reached it
+    if (eventId && events.events.some((event) => event.event.id === eventId)) {
+      done = true;
+    }
     yield activities;
   }
 }

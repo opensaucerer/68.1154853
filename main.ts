@@ -1,4 +1,6 @@
 // this is the main entry point of the application
+import * as dotenv from './dotenv';
+dotenv.loadEnv();
 import http from 'http';
 import * as migrator from './migrator';
 import * as logic from './logic';
@@ -42,6 +44,12 @@ async function main() {
 // block the runtime
 http
   .createServer((req, res) => {
+    main();
     res.writeHead(200);
   })
   .listen(3000);
+
+// send a request to the server to start the process
+http.get('http://localhost:3000', (res) => {
+  logger.info('Process triggered');
+});
