@@ -1,7 +1,7 @@
 // this is the main entry point of the application
 import * as dotenv from './dotenv';
 dotenv.loadEnv();
-import http from 'http';
+import * as http from 'http';
 import * as migrator from './migrator';
 import * as logic from './logic';
 import logger from './logger';
