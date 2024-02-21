@@ -14,6 +14,10 @@ export async function captureEvents() {
     name: 'last_processed_event_id',
   });
 
+  //   if (row) {
+  //     eventId = row.value;
+  //   }
+
   for await (const activities of reservoir.fetchListingActivities(
     1000,
     eventId
@@ -42,7 +46,7 @@ export async function captureEvents() {
 }
 
 export interface INft {
-  index: string;
+  token_index: string;
   contract_address: string;
   current_price: number | null;
   last_listing_timestamp: string;
@@ -75,7 +79,7 @@ export async function postCaptureProcessing() {
             : activity.listing_price;
 
         nfts[activity.contract_address + activity.token_index] = {
-          index: activity.token_index,
+          token_index: activity.token_index,
           contract_address: activity.contract_address,
           current_price,
           last_listing_timestamp: activity.event_timestamp,
@@ -99,7 +103,7 @@ export async function postCaptureProcessing() {
     // use on conflict based insertion to avoid the need for an extra existence check query
     await repository.insertMany(Object.values(nfts), 'nfts', {
       yes: true,
-      on: 'contract_address, index',
+      on: 'contract_address, token_index',
       do: 'UPDATE SET current_price = EXCLUDED.current_price, last_listing_timestamp = EXCLUDED.last_listing_timestamp',
     });
 
