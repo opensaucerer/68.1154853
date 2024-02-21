@@ -3,6 +3,7 @@ import * as repository from './repository';
 import event from './event';
 import env from './env';
 import logger from './logger';
+import { RowDataPacket } from 'mysql2';
 
 export async function captureEvents() {
   logger.info('[captureEvents] Starting to capture events');
@@ -10,13 +11,13 @@ export async function captureEvents() {
   let eventId = '';
 
   // find the last processed event id
-  const row = await repository.selectOne('events', {
+  const [rows] = (await repository.selectOne('events', {
     name: 'last_processed_event_id',
-  });
+  })) as RowDataPacket[];
 
-  //   if (row) {
-  //     eventId = row.value;
-  //   }
+  if (rows && rows.length) {
+    eventId = rows[0].value;
+  }
 
   for await (const activities of reservoir.fetchListingActivities(
     1000,

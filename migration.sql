@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS activities (
 );
 
 --  id
--- - index: string; size 42
+-- - token_index: string; size 42
 -- - contract_address: string; size 42
 -- - current_price: number
 -- - last_listing_timestamp: number
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS nfts (
   last_listing_timestamp TIMESTAMP NOT NULL
 );
 
--- unique index on nfts (index, contract_address);
+-- unique token_index on nfts (token_index, contract_address);
 CREATE UNIQUE INDEX nfts_index_contract_address ON nfts (token_index, contract_address);
 
 
