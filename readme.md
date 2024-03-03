@@ -30,14 +30,8 @@ Currently, the error handling doesn't focus on specifics as most of the queries 
 
 I should also mention that most of the implementations in this project are made from the ground up to simply demonstrate my understanding of the concepts. In a real-world scenario, I wouldn't go such route unless it is absolutely necessary rather I would use a library or framework that has been tested and proven to work.
 
-## Projections
-
-I apologize that the submission of this project happened toward the end of the 8 hours time frame. I wasn't feeling too well and had to take a break during the process. I do hope you understand. I think I spent just about 4 hours actually working on the project.
-
-I also did not make commits as I went along which ideally isn't the best practice as I was trying to get the project done as quickly as possible.
-
 I also started working on a test suite implementation but couldn't really compound on it. It was really just a thought I had and decided to experiment with it.
 
 ## Fun Facts
 
-The repository name `perfection-loveday-68.1154853` has an easter egg. The number `68.1154853` is the number of Bitcoins present within the Genesis address as of Sep 18, 2019
+The repository name `68.1154853` has an easter egg. The number `68.1154853` is the number of Bitcoins present within the Genesis address as of Sep 18, 2019
